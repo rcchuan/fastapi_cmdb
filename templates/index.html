@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMDB配置管理系统</title>
+    <!-- 外部资源引入 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                        info: '#1890FF',
+                        dark: '#1D2129',
+                        light: '#F2F3F5'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                },
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+
+            .card-shadow {
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            }
+
+            .transition-bg {
+                transition: background-color 0.2s ease;
+            }
+
+            .hover-highlight:hover {
+                background-color: rgba(22, 93, 255, 0.05);
+            }
+
+            .tab-active {
+                border-bottom: 2px solid #165DFF;
+                color: #165DFF;
+                font-weight: 500;
+            }
+
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+
+            .fade-in {
+                animation: fadeIn 0.3s ease-in-out;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                }
+                to {
+                    opacity: 1;
+                }
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-dark min-h-screen flex flex-col">
+<!-- 顶部导航栏 -->
+<header class="bg-white shadow-sm sticky top-0 z-30">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+            <!-- 左侧Logo和标题 -->
+            <div class="flex items-center space-x-3">
+                <div class="text-primary text-2xl">
+                    <i class="fa fa-database"></i>
+                </div>
+                <h1 class="text-xl font-semibold">CMDB配置管理系统</h1>
+            </div>
+
+            <!-- 右侧用户区域 -->
+            <div class="flex items-center space-x-6">
+                <button class="text-gray-500 hover:text-primary transition-colors relative">
+                    <i class="fa fa-bell-o"></i>
+                    <span class="absolute -top-1 -right-1 bg-danger text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">3</span>
+                </button>
+                <div class="flex items-center space-x-2 group">
+                    <img src="https://picsum.photos/id/1005/40/40" alt="用户头像"
+                         class="w-8 h-8 rounded-full object-cover border-2 border-transparent group-hover:border-primary transition-colors">
+                    <span class="hidden md:inline">管理员</span>
+                    <i class="fa fa-angle-down text-xs text-gray-500"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- 主要内容区域 -->
+<main class="flex-grow container mx-auto px-4 py-6">
+
+    <!-- Tab导航 -->
+    <div class="border-b border-gray-200 mb-6">
+        <div class="flex overflow-x-auto whitespace-nowrap pb-1 -mb-px scrollbar-hide">
+            <button class="tab-btn tab-active px-5 py-3 text-sm font-medium mr-2 transition-colors"
+                    data-tab="dashboard">
+                <i class="fa fa-dashboard mr-1"></i>Dashboard
+            </button>
+            <button class="tab-btn px-5 py-3 text-sm font-medium mr-2 transition-colors" data-tab="host">
+                <i class="fa fa-server mr-1"></i>主机管理
+            </button>
+            <button class="tab-btn px-5 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                    data-tab="asset">
+                <i class="fa fa-cubes mr-1"></i>资产管理
+            </button>
+            <button class="tab-btn px-5 py-3 text-sm font-medium mr-2 text-gray-500 hover:text-gray-700 transition-colors"
+                    data-tab="k8s">
+                <i class="fa fa-cloud mr-1"></i>K8s管理
+            </button>
+            <button class="tab-btn px-5 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                    data-tab="middleware">
+                <i class="fa fa-cogs mr-1"></i>中间件管理
+            </button>
+        </div>
+    </div>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div class="mt-4 md:mt-0 flex space-x-2">
+            <button class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center text-sm"
+                    id="refreshDataBtn">
+                <i class="fa fa-refresh mr-2"></i>刷新数据
+            </button>
+            <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors flex items-center text-sm">
+                <i class="fa fa-plus mr-2"></i>批量导入
+            </button>
+        </div>
+    </div>
+
+    <!-- Dashboard Tab内容 -->
+    <div class="tab-content fade-in" id="dashboard-tab">
+        <!-- 页面标题和概览统计 -->
+        <div class="mb-6">
+
+            <!-- 资源统计卡片 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg p-5 card-shadow hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm">主机总数</p>
+                            <h3 class="text-2xl font-bold mt-1" id="totalHosts">0</h3>
+                            <p class="text-success text-xs mt-2 flex items-center">
+                                <!-- <i class="fa fa-arrow-up mr-1"></i> 较上月增长 5.2% -->
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <i class="fa fa-server"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg p-5 card-shadow hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm">资产总数</p>
+                            <h3 class="text-2xl font-bold mt-1" id="totalAssets">0</h3>
+                            <p class="text-success text-xs mt-2 flex items-center">
+                                <!-- <i class="fa fa-arrow-up mr-1"></i> 较上月增长 5.2% -->
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <i class="fa fa-cubes"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg p-5 card-shadow hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm">K8s集群</p>
+                            <h3 class="text-2xl font-bold mt-1" id="totalK8s">0</h3>
+                            <p class="text-success text-xs mt-2 flex items-center">
+                                <!-- <i class="fa fa-arrow-up mr-1"></i> 较上月增长 2.0% -->
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-info/10 flex items-center justify-center text-info">
+                            <i class="fa fa-cloud"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg p-5 card-shadow hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm">中间件实例</p>
+                            <h3 class="text-2xl font-bold mt-1" id="totalMiddleware">0</h3>
+                            <p class="text-danger text-xs mt-2 flex items-center">
+                                <!-- <i class="fa fa-arrow-down mr-1"></i> 较上月减少 1.3% -->
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                            <i class="fa fa-cogs"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 资源分布图表 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg p-5 card-shadow lg:col-span-2">
+                    <h3 class="text-sm font-semibold mb-4">资源环境分布</h3>
+                    <div class="h-64">
+                        <canvas id="environmentChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg p-5 card-shadow">
+                    <h3 class="text-sm font-semibold mb-4">中间件类型分布</h3>
+                    <div class="h-64">
+                        <canvas id="middlewareTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主机管理Tab内容 -->
+    <div class="tab-content hidden" id="host-tab">
+        <!-- 搜索和筛选区 -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="relative">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="hostSearch" placeholder="搜索IP、主机名、环境、业务线..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="hostEnvFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有环境</option>
+                        <option value="prod">生产环境</option>
+                        <option value="test-cluster-01">测试环境</option>
+                        <option value="dev">开发环境</option>
+                        <option value="unknown">未知环境</option>
+                    </select>
+
+                    <select id="hostProviderFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有供应商</option>
+                        <option value="idc">IDC</option>
+                        <option value="aliyun">阿里云</option>
+                        <option value="tencent">腾讯云</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="hostOsFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有操作系统</option>
+                        <option value="linux">Linux</option>
+                        <option value="windows">Windows</option>
+                        <option value="Darwin">MacOS</option>
+                    </select>
+
+                    <!-- <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                      <i class="fa fa-filter mr-1"></i>筛选
+                    </button> -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格操作区 -->
+        <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+            <p class="text-gray-500"><i class="fa fa-info-circle mr-1"></i>共 <span id="hostTotalCount"
+                                                                                    class="font-medium">0</span> 台主机
+            </p>
+
+            <div class="mt-3 md:mt-0 flex space-x-3">
+                <button class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center export-btn">
+                    <i class="fa fa-download mr-2"></i>导出
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden card-shadow">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div class="flex items-center">
+                                <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+                            </div>
+                        </th>
+                        <!-- <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-primary">
+                          <div class="flex items-center">
+                            ID <i class="fa fa-sort ml-1"></i>
+                          </div>
+                        </th> -->
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-primary">
+                            <div class="flex items-center">
+                                主机名
+                            </div>
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-primary">
+                            <div class="flex items-center">
+                                IP地址
+                            </div>
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内存
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作系统
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">环境
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">标签
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">运维组
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">开发组
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">启用状态
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody id="hostTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- 表格数据将通过JS动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        上一页
+                    </button>
+                    <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        下一页
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            显示第 <span class="font-medium">1</span> 到 <span class="font-medium">5</span> 条，共 <span
+                                class="font-medium" id="hostPaginationCount">0</span> 条记录
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">上一页</span>
+                                <i class="fa fa-chevron-left text-xs"></i>
+                            </button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-sm font-medium text-white">
+                                1
+                            </button>
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">下一页</span>
+                                <i class="fa fa-chevron-right text-xs"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 资产管理Tab内容 -->
+    <div class="tab-content hidden" id="asset-tab">
+        <!-- 搜索和筛选区 -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="relative">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="assetSearch" placeholder="搜索名称、ID或IP地址..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="assetTypeFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有资产类型</option>
+                        <option value="MySQL">MySQL</option>
+                        <option value="Kafka">Kafka</option>
+                        <option value="Redis">Redis</option>
+                        <option value="Elasticsearch">Elasticsearch</option>
+                        <option value="MongoDB">MongoDB</option>
+                        <option value="RabbitMQ">RabbitMQ</option>
+                    </select>
+
+                    <select id="assetEnvFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有环境</option>
+                        <option value="生产环境">生产环境</option>
+                        <option value="测试环境">测试环境</option>
+                        <option value="开发环境">开发环境</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="assetStatusFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有状态</option>
+                        <option value="运行中">运行中</option>
+                        <option value="维护中">维护中</option>
+                        <option value="异常">异常</option>
+                        <option value="已停止">已停止</option>
+                    </select>
+
+                    <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-filter mr-1"></i>筛选
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格操作区 -->
+        <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+            <p class="text-gray-500"><i class="fa fa-info-circle mr-1"></i>共 <span id="assetTotalCount"
+                                                                                    class="font-medium">0</span> 个资产实例
+            </p>
+
+            <div class="mt-3 md:mt-0 flex space-x-3">
+                <button class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center">
+                    <i class="fa fa-download mr-2"></i>导出
+                </button>
+                <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors flex items-center">
+                    <i class="fa fa-plus mr-2"></i>新增中间件
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden card-shadow">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div class="flex items-center">
+                                <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+                            </div>
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden">
+                            ID
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">版本
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP:端口
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">环境
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">业务线
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody id="assetTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- 表格数据将通过JS动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        上一页
+                    </button>
+                    <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        下一页
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            显示第 <span class="font-medium">1</span> 到 <span class="font-medium">4</span> 条，共 <span
+                                class="font-medium" id="assetPaginationCount">0</span> 条记录
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">上一页</span>
+                                <i class="fa fa-chevron-left text-xs"></i>
+                            </button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-sm font-medium text-white">
+                                1
+                            </button>
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">下一页</span>
+                                <i class="fa fa-chevron-right text-xs"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- K8s管理Tab内容 -->
+    <div class="tab-content hidden" id="k8s-tab">
+        <!-- 搜索和筛选区 -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="relative">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="k8sSearch" placeholder="搜索集群名称、ID或命名空间..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="k8sEnvFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有环境</option>
+                        <option value="生产环境">生产环境</option>
+                        <option value="测试环境">测试环境</option>
+                        <option value="开发环境">开发环境</option>
+                    </select>
+
+                    <select id="k8sStatusFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有状态</option>
+                        <option value="运行中">运行中</option>
+                        <option value="维护中">维护中</option>
+                        <option value="异常">异常</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end">
+                    <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-filter mr-1"></i>筛选
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格操作区 -->
+        <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+            <p class="text-gray-500"><i class="fa fa-info-circle mr-1"></i>共 <span id="k8sTotalCount"
+                                                                                    class="font-medium">0</span> 个K8s集群
+            </p>
+
+            <div class="mt-3 md:mt-0 flex space-x-3">
+                <button class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center">
+                    <i class="fa fa-download mr-2"></i>导出
+                </button>
+                <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors flex items-center">
+                    <i class="fa fa-plus mr-2"></i>新增集群
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden card-shadow">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div class="flex items-center">
+                                <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+                            </div>
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">集群ID
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">集群名称
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">K8s版本
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">节点数量
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pod数量
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">环境
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">区域
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody id="k8sTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- 表格数据将通过JS动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        上一页
+                    </button>
+                    <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        下一页
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            显示第 <span class="font-medium">1</span> 到 <span class="font-medium">3</span> 条，共 <span
+                                class="font-medium" id="k8sPaginationCount">0</span> 条记录
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">上一页</span>
+                                <i class="fa fa-chevron-left text-xs"></i>
+                            </button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-sm font-medium text-white">
+                                1
+                            </button>
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">下一页</span>
+                                <i class="fa fa-chevron-right text-xs"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 中间件管理Tab内容 -->
+    <div class="tab-content hidden" id="middleware-tab">
+        <!-- 搜索和筛选区 -->
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="relative">
+                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="middlewareSearch" placeholder="搜索名称、ID或IP地址..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="middlewareTypeFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有中间件类型</option>
+                        <option value="MySQL">MySQL</option>
+                        <option value="Kafka">Kafka</option>
+                        <option value="Redis">Redis</option>
+                        <option value="Elasticsearch">Elasticsearch</option>
+                        <option value="MongoDB">MongoDB</option>
+                        <option value="RabbitMQ">RabbitMQ</option>
+                    </select>
+
+                    <select id="middlewareEnvFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有环境</option>
+                        <option value="生产环境">生产环境</option>
+                        <option value="测试环境">测试环境</option>
+                        <option value="开发环境">开发环境</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-3">
+                    <select id="middlewareStatusFilter"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                        <option value="">所有状态</option>
+                        <option value="运行中">运行中</option>
+                        <option value="维护中">维护中</option>
+                        <option value="异常">异常</option>
+                        <option value="已停止">已停止</option>
+                    </select>
+
+                    <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                        <i class="fa fa-filter mr-1"></i>筛选
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格操作区 -->
+        <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+            <p class="text-gray-500"><i class="fa fa-info-circle mr-1"></i>共 <span id="middlewareTotalCount"
+                                                                                    class="font-medium">0</span> 个中间件实例
+            </p>
+
+            <div class="mt-3 md:mt-0 flex space-x-3">
+                <button class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center">
+                    <i class="fa fa-download mr-2"></i>导出
+                </button>
+                <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors flex items-center">
+                    <i class="fa fa-plus mr-2"></i>新增中间件
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden card-shadow">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div class="flex items-center">
+                                <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+                            </div>
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">版本
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP:端口
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">环境
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">业务线
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody id="middlewareTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- 表格数据将通过JS动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        上一页
+                    </button>
+                    <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        下一页
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            显示第 <span class="font-medium">1</span> 到 <span class="font-medium">4</span> 条，共 <span
+                                class="font-medium" id="middlewarePaginationCount">0</span> 条记录
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">上一页</span>
+                                <i class="fa fa-chevron-left text-xs"></i>
+                            </button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-sm font-medium text-white">
+                                1
+                            </button>
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">下一页</span>
+                                <i class="fa fa-chevron-right text-xs"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- 详情模态框 -->
+<div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold" id="modalTitle">详情信息</h3>
+            <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-6" id="modalContent">
+            <!-- 详情内容将通过JS动态生成 -->
+        </div>
+
+        <div class="p-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+            <button id="cancelDetail"
+                    class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                关闭
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 主机编辑模态框 -->
+<div id="editHostModal"
+     class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4 max-h-80vh overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">编辑主机</h3>
+            <button id="closeEditModal" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-6">
+            <form id="editHostForm">
+                <!-- 隐藏的主机ID -->
+                <input type="hidden" id="editHostId">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+                    <div class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ID
+                            <input type="text" id="editId" class="w-full px-4 py-2 border border-gray-300 rounded-md"
+                                   readonly>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">环境
+                            <select id="editEnvironment" class="w-full px-4 py-2 border border-gray-300 rounded-md"
+                                    required>
+                                <option value="prod">生产环境</option>
+                                <option value="test">测试环境</option>
+                                <option value="dev">开发环境</option>
+                            </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">业务线
+                            <input type="text" id="editBusiness"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">区域
+                            <input type="text" id="editRegion"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">提供商
+                            <select id="editProvider" class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                                <option value="idc">IDC</option>
+                                <option value="ali">阿里云</option>
+                                <option value="tencent">腾讯云</option>
+                                <option value="other">其他</option>
+                            </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">序列号
+                            <input type="text" id="editSerial"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务类型
+                            <input type="text" id="editServiceType"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">运维组
+                            <input type="text" id="editOpGroup"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">开发组
+                            <input type="text" id="editDevGroup"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">标签
+                            <input type="text" id="editTags" class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="p-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+            <button id="cancelEdit"
+                    class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                取消
+            </button>
+            <button id="submitEdit"
+                    class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                保存修改
+            </button>
+        </div>
+    </div>
+</div>
+<!-- 成功提示框 -->
+<div id="successToast"
+     class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 text-green-800 rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 translate-y-[-20px]">
+    <i class="fa fa-check-circle text-green-500 text-xl"></i>
+    <span>更新成功</span>
+    <button onclick="hideToast('successToast')" class="ml-2 text-green-400 hover:text-green-600">
+        <i class="fa fa-times"></i>
+    </button>
+</div>
+
+<!-- 失败提示框 -->
+<div id="errorToast"
+     class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 text-red-800 rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 translate-y-[-20px]">
+    <i class="fa fa-exclamation-circle text-red-500 text-xl"></i>
+    <span id="errorMessage">更新失败</span>
+    <button onclick="hideToast('errorToast')" class="ml-2 text-red-400 hover:text-red-600">
+        <i class="fa fa-times"></i>
+    </button>
+</div>
+
+
+<!-- 页脚 -->
+<footer class="bg-white border-t border-gray-200 py-4 mt-8">
+    <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+        <p>©CMDB配置管理系统</p>
+    </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script type="module">
+
+    async function request(url, method = 'GET', data = {}) {
+        try {
+            const config = {
+                url,
+                method: method.toUpperCase(),
+                // GET/DELETE 用 params，其他用 data
+                [method.toUpperCase() === 'GET' ? 'params' : 'data']: data
+            };
+            const response = await axios(config);
+            return response.data; // 直接返回数据
+        } catch (err) {
+            // 失败时抛出错误信息
+            throw new Error(err.response?.data?.message || `请求失败: ${err.message}`);
+        }
+    }
+
+    /**
+     * 导出数据为CSV文件
+     * @param {Array} data - 要导出的数据数组
+     * @param {Array} headers - CSV表头配置（[{label: '显示文本', key: '数据字段名'}, ...]）
+     * @param {string} filename - 导出文件名（不带后缀）
+     */
+    function exportToCSV(data, headers, filename) {
+        // 1. 处理表头行（拼接表头文本）
+        const headerRow = headers.map(header => header.label).join(',');
+
+        // 2. 处理数据行（转换为CSV格式，处理特殊字符）
+        const dataRows = data.map(item => {
+            return headers.map(header => {
+                // 1. 获取字段值（可能为非字符串类型）
+                const value = header.key.split('.').reduce((obj, key) => obj?.[key] ?? '', item);
+
+                // 2. 关键修复：将 value 强制转为字符串，避免 includes() 报错
+                const strValue = String(value);
+
+                // 3. 处理特殊字符（基于转换后的字符串）
+                return strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')
+                    ? `"${strValue.replace(/"/g, '""')}"`  // 转义双引号
+                    : strValue;
+            }).join(',');
+        });
+
+        // 3. 拼接完整CSV内容（表头 + 数据行）
+        const csvContent = [headerRow, ...dataRows].join('\n');
+
+        // 4. 创建Blob对象并触发下载
+        const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url); // 释放URL对象
+    }
+
+    // 显示提示框
+    function showToast(type, message = '') {
+        const toast = document.getElementById(`${type}Toast`);
+        // 如果是失败提示，更新消息内容
+        if (type === 'error' && message) {
+            document.getElementById('errorMessage').textContent = `更新失败：${message}`;
+        }
+        // 显示提示（移除隐藏状态，添加动画）
+        toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
+        toast.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
+
+        // 3秒后自动隐藏
+        setTimeout(() => {
+            hideToast(`${type}Toast`);
+        }, 1000);
+    }
+
+    // 隐藏提示框
+    function hideToast(id) {
+        const toast = document.getElementById(id);
+        toast.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+        toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
+    }
+
+
+    // 主机数据 - 主机管理（精简版）
+    let hostData = [];
+    // const
+    // console.log('主机数据：', hostData);
+
+    // 模拟数据 - 资产管理（精简版）
+    const assetData = [
+        {
+            "id": "asset-001",
+            "name": "prod-mysql-main",
+            "type": "MySQL",
+            "version": "8.0.28",
+            "ip": "192.168.1.201",
+            "port": 3306,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "电商平台",
+            "status": "运行中",
+            "db_name": "ecommerce_main",
+            "instance_type": "主从架构",
+            "storage_size": "500GB",
+            "created_at": "2022-08-15"
+        },
+        {
+            "id": "asset-002",
+            "name": "prod-redis-cluster",
+            "type": "Redis",
+            "version": "6.2.6",
+            "ip": "192.168.1.211",
+            "port": 6379,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "电商平台",
+            "status": "运行中",
+            "cluster_size": 6,
+            "memory_limit": "32GB",
+            "mode": "cluster",
+            "created_at": "2022-09-02"
+        },
+        {
+            "id": "asset-003",
+            "name": "test-mysql-01",
+            "type": "MySQL",
+            "version": "8.0.28",
+            "ip": "192.168.2.201",
+            "port": 3306,
+            "environment": "测试环境",
+            "region": "华东",
+            "business": "电商平台",
+            "status": "运行中",
+            "db_name": "ecommerce_test",
+            "instance_type": "单节点",
+            "storage_size": "100GB",
+            "created_at": "2023-01-20"
+        },
+        {
+            "id": "asset-004",
+            "name": "prod-rabbitmq-cluster",
+            "type": "RabbitMQ",
+            "version": "3.9.13",
+            "ip": "192.168.1.251",
+            "port": 5672,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "内部系统",
+            "status": "维护中",
+            "node_count": 3,
+            "vhost_count": 5,
+            "queue_count": 32,
+            "created_at": "2022-07-12"
+        }
+    ];
+
+    // 模拟数据 - K8s管理（精简版）
+    const k8sData = [
+        {
+            "id": "k8s-001",
+            "name": "prod-cluster-01",
+            "version": "v1.24.7",
+            "node_count": 12,
+            "pod_count": 156,
+            "namespace_count": 18,
+            "environment": "生产环境",
+            "region": "华北",
+            "idc": "阿里云",
+            "status": "运行中",
+            "created_at": "2023-01-15",
+            "last_updated": "2023-08-20",
+            "container_runtime": "containerd",
+            "network_plugin": "calico",
+            "business": "电商平台"
+        },
+        {
+            "id": "k8s-002",
+            "name": "test-cluster-01",
+            "version": "v1.24.6",
+            "node_count": 6,
+            "pod_count": 45,
+            "namespace_count": 8,
+            "environment": "测试环境",
+            "region": "华东",
+            "idc": "腾讯云",
+            "status": "运行中",
+            "created_at": "2023-02-20",
+            "last_updated": "2023-08-10",
+            "container_runtime": "containerd",
+            "network_plugin": "flannel",
+            "business": "电商平台"
+        },
+        {
+            "id": "k8s-003",
+            "name": "dev-cluster-01",
+            "version": "v1.25.3",
+            "node_count": 4,
+            "pod_count": 28,
+            "namespace_count": 5,
+            "environment": "开发环境",
+            "region": "华南",
+            "idc": "华为云",
+            "status": "运行中",
+            "created_at": "2023-03-10",
+            "last_updated": "2023-09-05",
+            "container_runtime": "docker",
+            "network_plugin": "flannel",
+            "business": "全业务"
+        }
+    ];
+
+    // 模拟数据 - 中间件管理（精简版）
+    const middlewareData = [
+        {
+            "id": "middleware-001",
+            "name": "prod-mysql-main",
+            "type": "MySQL",
+            "version": "8.0.28",
+            "ip": "192.168.1.201",
+            "port": 3306,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "电商平台",
+            "status": "运行中",
+            "db_name": "ecommerce_main",
+            "instance_type": "主从架构",
+            "storage_size": "500GB",
+            "created_at": "2022-08-15"
+        },
+        {
+            "id": "middleware-002",
+            "name": "prod-redis-cluster",
+            "type": "Redis",
+            "version": "6.2.6",
+            "ip": "192.168.1.211",
+            "port": 6379,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "电商平台",
+            "status": "运行中",
+            "cluster_size": 6,
+            "memory_limit": "32GB",
+            "mode": "cluster",
+            "created_at": "2022-09-02"
+        },
+        {
+            "id": "middleware-003",
+            "name": "test-mysql-01",
+            "type": "MySQL",
+            "version": "8.0.28",
+            "ip": "192.168.2.201",
+            "port": 3306,
+            "environment": "测试环境",
+            "region": "华东",
+            "business": "电商平台",
+            "status": "运行中",
+            "db_name": "ecommerce_test",
+            "instance_type": "单节点",
+            "storage_size": "100GB",
+            "created_at": "2023-01-20"
+        },
+        {
+            "id": "middleware-004",
+            "name": "prod-rabbitmq-cluster",
+            "type": "RabbitMQ",
+            "version": "3.9.13",
+            "ip": "192.168.1.251",
+            "port": 5672,
+            "environment": "生产环境",
+            "region": "华北",
+            "business": "内部系统",
+            "status": "维护中",
+            "node_count": 3,
+            "vhost_count": 5,
+            "queue_count": 32,
+            "created_at": "2022-07-12"
+        }
+    ];
+
+    // DOM元素
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // 主机管理元素
+    const hostTableBody = document.getElementById('hostTableBody');
+    const hostTotalCount = document.getElementById('hostTotalCount');
+    const hostPaginationCount = document.getElementById('hostPaginationCount');
+    const hostSearch = document.getElementById('hostSearch');
+    const hostEnvFilter = document.getElementById('hostEnvFilter');
+    const hostProviderFilter = document.getElementById('hostProviderFilter');
+    const hostOsFilter = document.getElementById('hostOsFilter');
+
+    // 资产管理元素
+    const assetTableBody = document.getElementById('assetTableBody');
+    const assetTotalCount = document.getElementById('assetTotalCount');
+    const assetPaginationCount = document.getElementById('assetPaginationCount');
+    const assetSearch = document.getElementById('assetSearch');
+    const assetTypeFilter = document.getElementById('assetTypeFilter');
+    const assetEnvFilter = document.getElementById('assetEnvFilter');
+    const assetStatusFilter = document.getElementById('assetStatusFilter');
+
+    // K8s管理元素
+    const k8sTableBody = document.getElementById('k8sTableBody');
+    const k8sTotalCount = document.getElementById('k8sTotalCount');
+    const k8sPaginationCount = document.getElementById('k8sPaginationCount');
+    const k8sSearch = document.getElementById('k8sSearch');
+    const k8sEnvFilter = document.getElementById('k8sEnvFilter');
+    const k8sStatusFilter = document.getElementById('k8sStatusFilter');
+
+    // 中间件管理元素
+    const middlewareTableBody = document.getElementById('middlewareTableBody');
+    const middlewareTotalCount = document.getElementById('middlewareTotalCount');
+    const middlewarePaginationCount = document.getElementById('middlewarePaginationCount');
+    const middlewareSearch = document.getElementById('middlewareSearch');
+    const middlewareTypeFilter = document.getElementById('middlewareTypeFilter');
+    const middlewareEnvFilter = document.getElementById('middlewareEnvFilter');
+    const middlewareStatusFilter = document.getElementById('middlewareStatusFilter');
+
+    // 统计数据元素
+    const totalHosts = document.getElementById('totalHosts');
+    const totalAssets = document.getElementById('totalAssets');
+    const totalK8s = document.getElementById('totalK8s');
+    const totalMiddleware = document.getElementById('totalMiddleware');
+
+    // 模态框元素
+    const detailModal = document.getElementById('detailModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    const closeModal = document.getElementById('closeModal');
+    const cancelDetail = document.getElementById('cancelDetail');
+
+    // Tab切换功能
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // 移除所有Tab的激活状态
+            tabBtns.forEach(b => b.classList.remove('tab-active'));
+            tabContents.forEach(c => {
+                c.classList.add('hidden');
+                c.classList.remove('fade-in');
+            });
+
+            // 激活当前Tab
+            btn.classList.add('tab-active');
+            const tabId = btn.getAttribute('data-tab');
+            const activeTab = document.getElementById(`${tabId}-tab`);
+            activeTab.classList.remove('hidden');
+            setTimeout(() => {
+                activeTab.classList.add('fade-in');
+            }, 10);
+        });
+    });
+
+    // 渲染主机表格
+    function renderHostTable(data) {
+        hostTableBody.innerHTML = '';
+
+        if (data.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+          <td colspan="12" class="px-6 py-10 text-center text-gray-500">
+            <div class="flex flex-col items-center">
+              <i class="fa fa-search text-3xl mb-2"></i>
+              <p>没有找到匹配的主机数据</p>
+            </div>
+          </td>
+        `;
+            hostTableBody.appendChild(emptyRow);
+            return;
+        }
+
+        data.forEach(host => {
+            const row = document.createElement('tr');
+            row.className = 'hover-highlight transition-bg';
+            row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.hostname}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.ip}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.mem_total}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.cpu_count}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${host.distribution_name} ${host.distribution_version}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${host.environment === 'prod' ? 'bg-red-100 text-red-800' :
+                host.environment === 'test' ? 'bg-yellow-100 text-yellow-800' :
+                    host.environment === 'dev' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+              ${host.environment === 'prod' ? '生产环境' :
+                host.environment === 'test' ? '测试环境' :
+                    host.environment === 'dev' ? '开发环境' : '未知环境'}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.tags}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.op_group}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${host.dev_group}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${!host.enabled ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'}">
+              ${host.enabled ? '正常' : '已禁用'}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button class="text-primary hover:text-primary/80 mr-3 view-detail" data-type="host" data-id="${host.id}">
+              详情
+            </button>
+            <button class="text-gray-500 hover:text-gray-700 mr-3 edit-host" data-type="host" data-id="${host.id}">
+              编辑
+            </button>
+            <button class="text-danger hover:text-danger/80 operate-host" data-type="host" data-id="${host.id}">
+              ${host.enabled ? '禁用' : '启用'}
+            </button>
+          </td>
+        `;
+            hostTableBody.appendChild(row);
+        });
+
+        // 添加详情按钮事件
+        document.querySelectorAll('.view-detail[data-type="host"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                console.log('查看主机详情，ID：', id);
+                showHostDetail(id);
+            });
+        });
+        // 添加编辑按钮事件
+        document.querySelectorAll('.edit-host[data-type="host"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                console.log('编辑主机信息，ID：', id);
+                showEditHost(id);
+            });
+        });
+
+        // 添加禁用启用按钮事件
+        document.querySelectorAll('.operate-host[data-type="host"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                console.log('禁用启用主机，ID：', id);
+                operateHost(id);
+            });
+        });
+    }
+
+    // 渲染资产表格
+    function renderAssetTable(data) {
+        console.log(data);
+        if (data.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+          <td colspan="10" class="px-6 py-10 text-center text-gray-500">
+            <div class="flex flex-col items-center">
+              <i class="fa fa-search text-3xl mb-2"></i>
+              <p>没有找到匹配的中间件数据</p>
+            </div>
+          </td>
+        `;
+            assetTableBody.appendChild(emptyRow);
+            return;
+        }
+
+        data.forEach(asset => {
+            const row = document.createElement('tr');
+            row.className = 'hover-highlight transition-bg';
+            row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${asset.id}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.name}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+              ${asset.type}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.version}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.ip}:${asset.port}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${asset.environment === '生产环境' ? 'bg-red-100 text-red-800' :
+                asset.environment === '测试环境' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'}">
+              ${asset.environment}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.business}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${asset.status === '运行中' ? 'bg-green-100 text-green-800' :
+                asset.status === '维护中' ? 'bg-yellow-100 text-yellow-800' :
+                    asset.status === '已停止' ? 'bg-gray-100 text-gray-800' :
+                        'bg-red-100 text-red-800'}">
+              ${asset.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button class="text-primary hover:text-primary/80 mr-3 view-detail" data-type="middleware" data-id="${asset.id}">
+              详情
+            </button>
+            <button class="text-gray-500 hover:text-gray-700 mr-3">
+              编辑
+            </button>
+            <button class="text-danger hover:text-danger/80">
+              ${asset.status === '已停止' ? '启动' : '停止'}
+            </button>
+          </td>
+        `;
+            assetTableBody.appendChild(row);
+        });
+
+        // 添加详情按钮事件
+        document.querySelectorAll('.view-detail[data-type="asset"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                showAssetDetail(id);
+            });
+        });
+    }
+
+
+    // 渲染K8s表格
+    function renderK8sTable(data) {
+        k8sTableBody.innerHTML = '';
+
+        if (data.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+          <td colspan="11" class="px-6 py-10 text-center text-gray-500">
+            <div class="flex flex-col items-center">
+              <i class="fa fa-search text-3xl mb-2"></i>
+              <p>没有找到匹配的K8s集群数据</p>
+            </div>
+          </td>
+        `;
+            k8sTableBody.appendChild(emptyRow);
+            return;
+        }
+
+        data.forEach(cluster => {
+            const row = document.createElement('tr');
+            row.className = 'hover-highlight transition-bg';
+            row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${cluster.id}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.name}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.version}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.node_count}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.pod_count}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${cluster.environment === '生产环境' ? 'bg-red-100 text-red-800' :
+                cluster.environment === '测试环境' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'}">
+              ${cluster.environment}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.region}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${cluster.status === '运行中' ? 'bg-green-100 text-green-800' :
+                cluster.status === '维护中' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'}">
+              ${cluster.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${cluster.created_at}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button class="text-primary hover:text-primary/80 mr-3 view-detail" data-type="k8s" data-id="${cluster.id}">
+              详情
+            </button>
+            <button class="text-gray-500 hover:text-gray-700 mr-3">
+              编辑
+            </button>
+            <button class="text-danger hover:text-danger/80">
+              操作
+            </button>
+          </td>
+        `;
+            k8sTableBody.appendChild(row);
+        });
+
+        // 添加详情按钮事件
+        document.querySelectorAll('.view-detail[data-type="k8s"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                showK8sDetail(id);
+            });
+        });
+    }
+
+    // 渲染中间件表格
+    function renderMiddlewareTable(data) {
+        middlewareTableBody.innerHTML = '';
+
+        if (data.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+          <td colspan="10" class="px-6 py-10 text-center text-gray-500">
+            <div class="flex flex-col items-center">
+              <i class="fa fa-search text-3xl mb-2"></i>
+              <p>没有找到匹配的中间件数据</p>
+            </div>
+          </td>
+        `;
+            middlewareTableBody.appendChild(emptyRow);
+            return;
+        }
+
+        data.forEach(middleware => {
+            const row = document.createElement('tr');
+            row.className = 'hover-highlight transition-bg';
+            row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <input type="checkbox" class="h-4 w-4 text-primary border-gray-300 rounded">
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${middleware.id}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${middleware.name}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+              ${middleware.type}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${middleware.version}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${middleware.ip}:${middleware.port}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${middleware.environment === '生产环境' ? 'bg-red-100 text-red-800' :
+                middleware.environment === '测试环境' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'}">
+              ${middleware.environment}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${middleware.business}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+              ${middleware.status === '运行中' ? 'bg-green-100 text-green-800' :
+                middleware.status === '维护中' ? 'bg-yellow-100 text-yellow-800' :
+                    middleware.status === '已停止' ? 'bg-gray-100 text-gray-800' :
+                        'bg-red-100 text-red-800'}">
+              ${middleware.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button class="text-primary hover:text-primary/80 mr-3 view-detail" data-type="middleware" data-id="${middleware.id}">
+              详情
+            </button>
+            <button class="text-gray-500 hover:text-gray-700 mr-3">
+              编辑
+            </button>
+            <button class="text-danger hover:text-danger/80">
+              ${middleware.status === '已停止' ? '启动' : '停止'}
+            </button>
+          </td>
+        `;
+            middlewareTableBody.appendChild(row);
+        });
+
+        // 添加详情按钮事件
+        document.querySelectorAll('.view-detail[data-type="middleware"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const id = button.getAttribute('data-id');
+                showMiddlewareDetail(id);
+            });
+        });
+    }
+
+    // 显示主机详情
+    function showHostDetail(id) {
+        console.log("hostData:", hostData);
+        const host = hostData.find(item => {
+            console.log("item:", item);
+            console.log("item.id:", item.id, "id:", id);
+            if (item.id == id) {
+                return true;
+            }
+        });
+        if (!host) {
+            console.error('未找到主机，ID：', id);
+            return;
+        }
+
+        modalTitle.textContent = `主机详情: ${host.hostname} (${host.ip})`;
+
+        // 构建详情内容
+        modalContent.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">基本信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">ID:</span>
+                <span class="font-medium">${host.id}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">IP地址:</span>
+                <span class="font-medium">${host.ip}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">主机名:</span>
+                <span class="font-medium">${host.hostname}</span>
+              </li>
+
+              <li class="flex justify-between">
+                <span class="text-gray-500">状态:</span>
+                <span class="font-medium ${host.disabled ? 'text-danger' : 'text-success'}"">${host.enabled ? '正常' : '已禁用'}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">上报时间:</span>
+                <span class="font-medium">${host.report_time}</span>
+              </li>
+               <li class="flex justify-between">
+                <span class="text-gray-500">创建时间:</span>
+                <span class="font-medium">${host.create_time}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">硬件信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">总内存:</span>
+                <span class="font-medium">${host.mem_total}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">CPU核心数:</span>
+                <span class="font-medium">${host.cpu_count}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">操作系统类型:</span>
+                <span class="font-medium">${host.os_type}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">操作系统架构:</span>
+                <span class="font-medium">${host.os_arch}</span>
+              </li>
+
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">操作系统信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">发行版名称:</span>
+                <span class="font-medium">${host.distribution_name}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">发行版版本:</span>
+                <span class="font-medium">${host.distribution_version}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">操作系统版本:</span>
+                <span class="font-medium">${host.os_version}</span>
+              </li>
+
+
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">业务信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between align-items-center">
+                <span class="text-gray-500">环境:</span>
+                <span class="font-medium px-2 inline-flex text-xs leading-6 font-semibold rounded-full text-center ${host.environment === 'prod' ? 'bg-red-100 text-red-800' :
+            host.environment === 'test' ? 'bg-yellow-100 text-yellow-800' :
+                host.environment === 'dev' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                  ${host.environment === 'prod' ? '生产环境' :
+            host.environment === 'test' ? '测试环境' :
+                host.environment === 'dev' ? '开发环境' : '未知环境'}
+                </span>
+
+
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">区域:</span>
+                <span class="font-medium">${host.region}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">提供商:</span>
+                <span class="font-medium">${host.provider}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">业务线:</span>
+                <span class="font-medium">${host.business}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">服务类型:</span>
+                <span class="font-medium">${host.service_type}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">序列号:</span>
+                <span class="font-medium">${host.serial}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">node_exporter端口:</span>
+                <span class="font-medium">${host.node_exporter_port}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">团队信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">运维组:</span>
+                <span class="font-medium">${host.op_group}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">开发组:</span>
+                <span class="font-medium">${host.dev_group}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">标签</h4>
+            <div class="flex flex-wrap gap-2">
+              ${host.tags.split(',').map(tag => `
+                <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">${tag}</span>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+        detailModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // 显示资产详情
+    function showAssetDetail(id) {
+        const asset = assetData.find(item => item.id === id);
+        if (!asset) return;
+
+        modalTitle.textContent = `资产详情: ${asset.name} (${asset.type})`;
+
+        // 构建详情内容
+        modalContent.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">基本信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">ID:</span>
+                <span class="font-medium">${asset.id}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">名称:</span>
+                <span class="font-medium">${asset.name}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">类型:</span>
+                <span class="font-medium">${asset.type}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">版本:</span>
+                <span class="font-medium">${asset.version}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">地址:</span>
+                <span class="font-medium">${asset.ip}:${asset.port}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">创建时间:</span>
+                <span class="font-medium">${asset.created_at || '未知'}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">部署信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">环境:</span>
+                <span class="font-medium">${asset.environment}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">区域:</span>
+                <span class="font-medium">${asset.region}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">业务线:</span>
+                <span class="font-medium">${asset.business}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">状态:</span>
+                <span class="font-medium ${asset.status === '运行中' ? 'text-success' :
+            asset.status === '维护中' ? 'text-warning' :
+                asset.status === '已停止' ? 'text-gray-500' : 'text-danger'}">${asset.status}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">配置信息</h4>
+            <ul class="space-y-3">
+              ${asset.db_name ? `<li class="flex justify-between">
+                <span class="text-gray-500">数据库名称:</span>
+                <span class="font-medium">${asset.db_name}</span>
+              </li>` : ''}
+
+              ${asset.instance_type ? `<li class="flex justify-between">
+                <span class="text-gray-500">实例类型:</span>
+                <span class="font-medium">${asset.instance_type}</span>
+              </li>` : ''}
+
+              ${asset.cluster_size ? `<li class="flex justify-between">
+                <span class="text-gray-500">集群规模:</span>
+                <span class="font-medium">${asset.cluster_size} 节点</span>
+              </li>` : ''}
+
+              ${asset.storage_size ? `<li class="flex justify-between">
+                <span class="text-gray-500">存储容量:</span>
+                <span class="font-medium">${asset.storage_size}</span>
+              </li>` : ''}
+
+              ${asset.memory_limit ? `<li class="flex justify-between">
+                <span class="text-gray-500">内存限制:</span>
+                <span class="font-medium">${asset.memory_limit}</span>
+              </li>` : ''}
+
+              ${asset.mode ? `<li class="flex justify-between">
+                <span class="text-gray-500">运行模式:</span>
+                <span class="font-medium">${asset.mode}</span>
+              </li>` : ''}
+            </ul>
+          </div>
+        </div>
+      `;
+
+        detailModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+
+    // 显示K8s详情
+    function showK8sDetail(id) {
+        const cluster = k8sData.find(item => item.id === id);
+        if (!cluster) return;
+
+        modalTitle.textContent = `K8s集群详情: ${cluster.name}`;
+
+        // 构建详情内容
+        modalContent.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">基本信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">集群ID:</span>
+                <span class="font-medium">${cluster.id}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">集群名称:</span>
+                <span class="font-medium">${cluster.name}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">K8s版本:</span>
+                <span class="font-medium">${cluster.version}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">创建时间:</span>
+                <span class="font-medium">${cluster.created_at}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">最后更新时间:</span>
+                <span class="font-medium">${cluster.last_updated}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">资源信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">节点数量:</span>
+                <span class="font-medium">${cluster.node_count}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">Pod数量:</span>
+                <span class="font-medium">${cluster.pod_count}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">命名空间数量:</span>
+                <span class="font-medium">${cluster.namespace_count}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">容器运行时:</span>
+                <span class="font-medium">${cluster.container_runtime}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">网络插件:</span>
+                <span class="font-medium">${cluster.network_plugin}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">部署信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">环境:</span>
+                <span class="font-medium">${cluster.environment}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">区域:</span>
+                <span class="font-medium">${cluster.region}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">IDC:</span>
+                <span class="font-medium">${cluster.idc}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">业务线:</span>
+                <span class="font-medium">${cluster.business}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">状态:</span>
+                <span class="font-medium ${cluster.status === '运行中' ? 'text-success' :
+            cluster.status === '维护中' ? 'text-warning' : 'text-danger'}">${cluster.status}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+
+        detailModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // 显示中间件详情
+    function showMiddlewareDetail(id) {
+        const middleware = middlewareData.find(item => item.id === id);
+        if (!middleware) return;
+
+        modalTitle.textContent = `中间件详情: ${middleware.name} (${middleware.type})`;
+
+        // 构建详情内容
+        modalContent.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">基本信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">ID:</span>
+                <span class="font-medium">${middleware.id}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">名称:</span>
+                <span class="font-medium">${middleware.name}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">类型:</span>
+                <span class="font-medium">${middleware.type}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">版本:</span>
+                <span class="font-medium">${middleware.version}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">地址:</span>
+                <span class="font-medium">${middleware.ip}:${middleware.port}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">创建时间:</span>
+                <span class="font-medium">${middleware.created_at || '未知'}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">部署信息</h4>
+            <ul class="space-y-3">
+              <li class="flex justify-between">
+                <span class="text-gray-500">环境:</span>
+                <span class="font-medium">${middleware.environment}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">区域:</span>
+                <span class="font-medium">${middleware.region}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">业务线:</span>
+                <span class="font-medium">${middleware.business}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-500">状态:</span>
+                <span class="font-medium ${middleware.status === '运行中' ? 'text-success' :
+            middleware.status === '维护中' ? 'text-warning' :
+                middleware.status === '已停止' ? 'text-gray-500' : 'text-danger'}">${middleware.status}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">配置信息</h4>
+            <ul class="space-y-3">
+              ${middleware.db_name ? `<li class="flex justify-between">
+                <span class="text-gray-500">数据库名称:</span>
+                <span class="font-medium">${middleware.db_name}</span>
+              </li>` : ''}
+
+              ${middleware.instance_type ? `<li class="flex justify-between">
+                <span class="text-gray-500">实例类型:</span>
+                <span class="font-medium">${middleware.instance_type}</span>
+              </li>` : ''}
+
+              ${middleware.cluster_size ? `<li class="flex justify-between">
+                <span class="text-gray-500">集群规模:</span>
+                <span class="font-medium">${middleware.cluster_size} 节点</span>
+              </li>` : ''}
+
+              ${middleware.storage_size ? `<li class="flex justify-between">
+                <span class="text-gray-500">存储容量:</span>
+                <span class="font-medium">${middleware.storage_size}</span>
+              </li>` : ''}
+
+              ${middleware.memory_limit ? `<li class="flex justify-between">
+                <span class="text-gray-500">内存限制:</span>
+                <span class="font-medium">${middleware.memory_limit}</span>
+              </li>` : ''}
+
+              ${middleware.mode ? `<li class="flex justify-between">
+                <span class="text-gray-500">运行模式:</span>
+                <span class="font-medium">${middleware.mode}</span>
+              </li>` : ''}
+            </ul>
+          </div>
+        </div>
+      `;
+
+        detailModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // 关闭模态框
+    function closeDetailModal() {
+        detailModal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    // 编辑模态框元素
+    const editHostModal = document.getElementById('editHostModal');
+    const editId = document.getElementById('editId');
+    const editEnvironment = document.getElementById('editEnvironment');
+    const editBusiness = document.getElementById('editBusiness');
+    const editRegion = document.getElementById('editRegion');
+    const editProvider = document.getElementById('editProvider');
+    const editServiceType = document.getElementById('editServiceType');
+    const editSerial = document.getElementById('editSerial');
+    const editOpGroup = document.getElementById('editOpGroup');
+    const editDevGroup = document.getElementById('editDevGroup');
+    const editTags = document.getElementById('editTags');
+    const closeEditModal = document.getElementById('closeEditModal');
+    const cancelEdit = document.getElementById('cancelEdit');
+    const submitEdit = document.getElementById('submitEdit');
+    const refreshDataBtn = document.getElementById('refreshDataBtn');
+
+    async function operateHost(id) {
+        const host = hostData.find(item => {
+            console.log("item:", item);
+            console.log("item.id:", item.id, "id:", id);
+            if (item.id == id) {
+                console.log("找到主机，ID：", id);
+                return true;
+            }
+            return false;
+        });
+        if (!host) {
+            console.error('未找到主机，ID：', id);
+            return;
+        }
+        try {
+            console.log("host:", host);
+            let response;
+            if (host.enabled) {
+                // 禁用主机
+                response = await request(`http://localhost:8001/api/v1/host/${host.id}/disable`, 'POST');
+            } else {
+                // 启用主机
+                response = await request(`http://localhost:8001/api/v1/host/${host.id}/enable`, 'POST');
+            }
+            console.log('Update response:', response);
+            if (response.code != 0) throw new Error('操作失败');
+
+            // 刷新数据并关闭模态框
+            const updatedHost = response.data;
+            console.log("updatedHost:", updatedHost);
+            console.log("hostData before update:", hostData);
+            const index = hostData.findIndex(h => h.id == updatedHost.id);
+            console.log("index:", index);
+            if (index !== -1) hostData[index] = updatedHost;
+            renderHostTable(hostData); // 重新渲染表格
+            showToast('success');
+        } catch (error) {
+            showToast('error', error.message);
+        }
+    }
+
+    // 打开编辑模态框（绑定到编辑按钮）
+    function showEditHost(id) {
+        const host = hostData.find(item => {
+            console.log("item:", item);
+            console.log("item.id:", item.id, "id:", id);
+            if (item.id == id) {
+                return true;
+            }
+        });
+        if (!host) {
+            console.error('未找到主机，ID：', id);
+            return;
+        }
+
+        // 填充表单数据
+        editId.value = host.id;
+        editEnvironment.value = host.environment;
+        editBusiness.value = host.business;
+        editRegion.value = host.region;
+        editProvider.value = host.provider;
+        editServiceType.value = host.service_type;
+        editSerial.value = host.serial;
+        editOpGroup.value = host.op_group;
+        editDevGroup.value = host.dev_group;
+        editTags.value = host.tags;
+
+        editHostModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        // document.addEventListener('click', (e) => {
+        //   if (e.target.closest('.text-gray-500.hover\\:text-gray-700.mr-3') &&
+        //       e.target.textContent.trim() === '编辑') {
+        //     const btn = e.target.closest('button');
+        //     const hostId = btn.closest('tr').querySelector('td:nth-child(2)').textContent;
+        //     const host = hostData.find(h => h.id === hostId);
+
+        //     if (host) {
+        //       // 填充表单数据
+        //       editBusiness.value = host.business;
+        //       editEnvironment.value = host.environment;
+        //       editRegion.value = host.region;
+        //       editProvider.value = host.provider;
+        //       editOpGroup.value = host.op_group;
+        //       editDevGroup.value = host.dev_group;
+        //       editTags.value = host.tags.join(', ');
+
+        //       // 显示模态框
+        //       editHostModal.classList.remove('hidden');
+        //       document.body.style.overflow = 'hidden';
+        //     }
+        //   }
+        // });
+
+    }
+
+    // 关闭编辑模态框
+    function closeEditModalFunc() {
+        editHostModal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    closeEditModal.addEventListener('click', closeEditModalFunc);
+    cancelEdit.addEventListener('click', closeEditModalFunc);
+
+    refreshDataBtn.addEventListener('click', async () => {
+        try {
+            const response = await request('http://localhost:8001/api/v1/host/search', 'GET');
+            if (response.code != 0) throw new Error('获取主机数据失败');
+            hostData = response.data;
+            const filteredHost = getFilteredHostData();
+            renderHostTable(filteredHost);
+            showToast('success', '数据已刷新');
+        } catch (error) {
+            showToast('error', error.message);
+        }
+    });
+
+    // 提交编辑表单
+    submitEdit.addEventListener('click', async () => {
+        // 表单验证
+        // if (!editHostname.value || !editMemTotal.value || !editCpuCount.value) {
+        //   alert('带*的字段为必填项');
+        //   return;
+        // }
+
+        // 构建请求数据
+        const updatedData = {
+            environment: editEnvironment.value,
+            region: editRegion.value,
+            business: editBusiness.value,
+            provider: editProvider.value,
+            service_type: editServiceType.value,
+            serial: editSerial.value,
+            op_group: editOpGroup.value,
+            dev_group: editDevGroup.value,
+            tags: editTags.value,
+        };
+
+        try {
+            // 发送POST请求更新主机信息
+            const response = await request(`http://localhost:8001/api/v1/host/${editId.value}`, 'POST', updatedData);
+            console.log('Update response:', response);
+            if (response.code != 0) throw new Error('更新失败');
+
+            // 刷新数据并关闭模态框
+            const updatedHost = await response.data;
+            const index = hostData.findIndex(h => h.id == updatedHost.id);
+            if (index !== -1) hostData[index] = updatedHost;
+            renderHostTable(hostData); // 重新渲染表格
+            closeEditModalFunc();
+            showToast('success');
+        } catch (error) {
+            showToast('error', error.message);
+        }
+    });
+
+    // 初始化图表
+    function initCharts() {
+        // 环境分布图表
+        const envCtx = document.getElementById('environmentChart').getContext('2d');
+        new Chart(envCtx, {
+            type: 'bar',
+            data: {
+                labels: ['生产环境', '测试环境', '开发环境'],
+                datasets: [
+                    {
+                        label: '主机',
+                        data: [3, 1, 1],
+                        backgroundColor: '#165DFF',
+                        borderRadius: 4
+                    },
+                    {
+                        label: '资产',
+                        data: [3, 1, 1],
+                        backgroundColor: '#52C41A',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'K8s集群',
+                        data: [1, 1, 1],
+                        backgroundColor: '#1890FF',
+                        borderRadius: 4
+                    },
+                    {
+                        label: '中间件',
+                        data: [3, 1, 0],
+                        backgroundColor: '#FAAD14',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // 中间件类型分布图表
+        const middlewareCtx = document.getElementById('middlewareTypeChart').getContext('2d');
+        new Chart(middlewareCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['MySQL', 'Redis', 'RabbitMQ'],
+                datasets: [{
+                    data: [2, 1, 1],
+                    backgroundColor: [
+                        '#165DFF',
+                        '#52C41A',
+                        '#FAAD14'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%'
+            }
+        });
+    }
+
+    // 初始化统计数据
+    function initStats() {
+        totalHosts.textContent = hostData.length;
+        totalAssets.textContent = assetData.length;
+        totalK8s.textContent = k8sData.length;
+        totalMiddleware.textContent = middlewareData.length;
+
+        assetTotalCount.textContent = assetData.length;
+        assetPaginationCount.textContent = assetData.length;
+
+        hostTotalCount.textContent = hostData.length;
+        hostPaginationCount.textContent = hostData.length;
+
+        k8sTotalCount.textContent = k8sData.length;
+        k8sPaginationCount.textContent = k8sData.length;
+
+        middlewareTotalCount.textContent = middlewareData.length;
+        middlewarePaginationCount.textContent = middlewareData.length;
+    }
+
+    // 初始化筛选功能
+    function initFilters() {
+        // 主机筛选
+        const filterHosts = () => {
+            const searchTerm = hostSearch.value.toLowerCase();
+            const env = hostEnvFilter.value;
+            const os_type = hostOsFilter.value;
+            const provider = hostProviderFilter.value;
+            console.log('Filtering hosts with:', {searchTerm, env, os_type, provider});
+            const filtered = hostData.filter(host => {
+                console.log('Checking host:', host);
+                console.log(host.business);
+                console.log(host.ip);
+                console.log(host.provider);
+                console.log(host.environment);
+                console.log(host.hostname);
+                const matchesSearch = host.business.toLowerCase().includes(searchTerm) ||
+                    host.ip.toLowerCase().includes(searchTerm) ||
+                    host.provider.toLowerCase().includes(searchTerm) ||
+                    host.environment.toLowerCase().includes(searchTerm) ||
+                    host.hostname.toLowerCase().includes(searchTerm);
+
+                const matchesEnv = !env || host.environment === env;
+                const matchesProvider = !provider || host.provider === provider;
+                const matchesOs = !os_type || host.os_type.toLowerCase() === os_type.toLowerCase();
+
+                return matchesSearch && matchesEnv && matchesProvider && matchesOs;
+            });
+
+            renderHostTable(filtered);
+            hostTotalCount.textContent = filtered.length;
+            hostPaginationCount.textContent = filtered.length;
+        };
+
+        hostSearch.addEventListener('input', filterHosts);
+        hostEnvFilter.addEventListener('change', filterHosts);
+        hostOsFilter.addEventListener('change', filterHosts);
+        hostProviderFilter.addEventListener('change', filterHosts);
+
+        // 资产筛选
+        const filterAsset = () => {
+            const searchTerm = assetSearch.value.toLowerCase();
+            const type = assetTypeFilter.value;
+            const env = assetEnvFilter.value;
+            const status = assetStatusFilter.value;
+
+            const filtered = assetData.filter(asset => {
+                const matchesSearch = asset.id.toLowerCase().includes(searchTerm) ||
+                    asset.name.toLowerCase().includes(searchTerm) ||
+                    asset.ip.toLowerCase().includes(searchTerm);
+
+                const matchesType = !type || asset.type === type;
+                const matchesEnv = !env || asset.environment === env;
+                const matchesStatus = !status || asset.status === status;
+
+                return matchesSearch && matchesType && matchesEnv && matchesStatus;
+            });
+
+            renderAssetTable(filtered);
+            assetTotalCount.textContent = filtered.length;
+            assetPaginationCount.textContent = filtered.length;
+        };
+
+        assetSearch.addEventListener('input', filterAsset);
+        assetTypeFilter.addEventListener('change', filterAsset);
+        assetEnvFilter.addEventListener('change', filterAsset);
+        assetStatusFilter.addEventListener('change', filterAsset);
+
+        // K8s筛选
+        const filterK8s = () => {
+            const searchTerm = k8sSearch.value.toLowerCase();
+            const env = k8sEnvFilter.value;
+            const status = k8sStatusFilter.value;
+
+            const filtered = k8sData.filter(cluster => {
+                const matchesSearch = cluster.id.toLowerCase().includes(searchTerm) ||
+                    cluster.name.toLowerCase().includes(searchTerm);
+
+                const matchesEnv = !env || cluster.environment === env;
+                const matchesStatus = !status || cluster.status === status;
+
+                return matchesSearch && matchesEnv && matchesStatus;
+            });
+
+            renderK8sTable(filtered);
+            k8sTotalCount.textContent = filtered.length;
+            k8sPaginationCount.textContent = filtered.length;
+        };
+
+        k8sSearch.addEventListener('input', filterK8s);
+        k8sEnvFilter.addEventListener('change', filterK8s);
+        k8sStatusFilter.addEventListener('change', filterK8s);
+
+        // 中间件筛选
+        const filterMiddleware = () => {
+            const searchTerm = middlewareSearch.value.toLowerCase();
+            const type = middlewareTypeFilter.value;
+            const env = middlewareEnvFilter.value;
+            const status = middlewareStatusFilter.value;
+
+            const filtered = middlewareData.filter(mw => {
+                const matchesSearch = mw.id.toLowerCase().includes(searchTerm) ||
+                    mw.name.toLowerCase().includes(searchTerm) ||
+                    mw.ip.toLowerCase().includes(searchTerm);
+
+                const matchesType = !type || mw.type === type;
+                const matchesEnv = !env || mw.environment === env;
+                const matchesStatus = !status || mw.status === status;
+
+                return matchesSearch && matchesType && matchesEnv && matchesStatus;
+            });
+
+            renderMiddlewareTable(filtered);
+            middlewareTotalCount.textContent = filtered.length;
+            middlewarePaginationCount.textContent = filtered.length;
+        };
+
+        middlewareSearch.addEventListener('input', filterMiddleware);
+        middlewareTypeFilter.addEventListener('change', filterMiddleware);
+        middlewareEnvFilter.addEventListener('change', filterMiddleware);
+        middlewareStatusFilter.addEventListener('change', filterMiddleware);
+    }
+
+    // 初始化事件监听
+    function initEventListeners() {
+        closeModal.addEventListener('click', closeDetailModal);
+        cancelDetail.addEventListener('click', closeDetailModal);
+
+        // 点击模态框外部关闭
+        detailModal.addEventListener('click', (e) => {
+            if (e.target === detailModal) {
+                closeDetailModal();
+            }
+        });
+    }
+
+    // 导出配置：key为Tab类型，value为{headers:表头配置, getData:数据提取函数}
+    const exportConfigs = {
+        // 主机导出配置
+        host: {
+            headers: [
+                {label: 'ID', key: 'id'},
+                {label: 'IP地址', key: 'ip'},
+                {label: '主机名', key: 'hostname'},
+                {label: '总内存', key: 'mem_total'},
+                {label: 'CPU核心数', key: 'cpu_count'},
+                {label: '操作系统', key: 'distribution_name'},
+                {label: '环境', key: 'environment'},
+                {label: '区域', key: 'region'},
+                {label: '业务线', key: 'business'},
+                {label: '状态', key: 'disabled', formatter: (val) => val ? '已禁用' : '正常'}
+            ],
+            // 处理数据：格式化特殊字段（如状态转换）
+            getData: (rawData) => rawData.map(item => ({
+                ...item,
+                disabled: item.disabled ? '已禁用' : '正常' // 转换布尔值为文字
+            }))
+        },
+    };
+    // 绑定所有导出按钮（假设导出按钮类名为"export-btn"）
+    document.querySelectorAll('.export-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // 1. 获取当前激活的Tab（确定导出类型）
+            const activeTab = document.querySelector('.tab-btn.tab-active').getAttribute('data-tab');
+            if (!exportConfigs[activeTab]) {
+                showToast('error', '未配置该类型的导出规则');
+                return;
+            }
+
+            // 2. 获取当前Tab的筛选后数据（而非原始数据，确保导出的是用户看到的数据）
+            let filteredData;
+            switch (activeTab) {
+                case 'host':
+                    // 复用主机筛选逻辑（和表格渲染时的筛选数据一致）
+                    filteredData = getFilteredHostData();
+                    break;
+                case 'k8s':
+                    filteredData = getFilteredK8sData();
+                    break;
+                case 'middleware':
+                    filteredData = getFilteredMiddlewareData();
+                    break;
+                default:
+                    filteredData = [];
+            }
+
+            // 3. 校验数据
+            if (filteredData.length === 0) {
+                showToast('error', '没有可导出的数据');
+                return;
+            }
+
+            // 4. 执行导出
+            const {headers, getData} = exportConfigs[activeTab];
+            const processedData = getData(filteredData); // 处理数据格式
+            exportToCSV(processedData, headers, `${activeTab}_export`); // 触发下载
+            showToast('success', `成功导出 ${filteredData.length} 条数据`);
+        });
+    });
+
+    // 示例：获取筛选后的主机数据（需与表格筛选逻辑一致）
+    function getFilteredHostData() {
+        const searchTerm = hostSearch.value.toLowerCase();
+        const env = hostEnvFilter.value;
+        const provider = hostProviderFilter.value;
+        const os_type = hostOsFilter.value;
+
+        return hostData.filter(host => {
+            const matchesSearch = host.business.toLowerCase().includes(searchTerm) ||
+                host.ip.toLowerCase().includes(searchTerm) ||
+                host.provider.toLowerCase().includes(searchTerm) ||
+                host.environment.toLowerCase().includes(searchTerm) ||
+                host.hostname.toLowerCase().includes(searchTerm);
+            const matchesEnv = !env || host.environment === env;
+            const matchesProvider = !provider || host.provider === provider;
+            const matchesOs = !os_type || host.os_type === os_type;
+            return matchesSearch && matchesEnv && matchesProvider && matchesOs;
+        });
+    }
+
+
+    // 初始化页面
+    async function init() {
+        hostData = await request('http://localhost:8001/api/v1/host/search', 'GET', {});
+        hostData = hostData.data; // 假设返回的数据结构是 { hosts: [...] }
+        // 渲染表格数据
+        console.log('Rendering tables with data:', {hostData, assetData, k8sData, middlewareData});
+        renderHostTable(hostData);
+        renderAssetTable(assetData);
+        renderK8sTable(k8sData);
+        renderMiddlewareTable(middlewareData);
+
+        // 初始化统计数据
+        initStats();
+
+        // 初始化图表
+        initCharts();
+
+        // 初始化筛选功能
+        initFilters();
+
+        // 初始化事件监听
+        initEventListeners();
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', init);
+    // 测试：用匿名函数替代 init
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOMContentLoaded 触发了！'); // 若控制台输出，说明事件正常
+    });
+
+</script>
+</body>
+</html>

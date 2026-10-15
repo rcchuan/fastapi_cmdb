@@ -1,0 +1,14 @@
+# Python 虚拟环境
+/CMDB/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 本地环境变量和运行文件
+.env
+*.log
+
+# 编辑器配置
+.idea/
+.vscode/
